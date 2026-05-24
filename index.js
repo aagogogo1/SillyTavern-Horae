@@ -280,7 +280,7 @@ let _summaryInProgress = false;
 let _panelAiAnalyzeInProgress = false;
 let _chatFullyLoaded = false;
 let _portsReady = false;
-let _autoSummaryRanThisTurn = false;
+
 let _vectorEnsureIndexPromise = null;
 let _vectorEnsureIndexChatId = null;
 // 记录上一次已知的 chat 数组引用快照，删除楼层时通过对比定位被删的最早索引
@@ -18747,8 +18747,6 @@ function _sanitizeThinkBlockHoraeTags(mes) {
  */
 async function onMessageReceived(messageId) {
     if (!settings.enabled || !settings.autoParse) return;
-    _autoSummaryRanThisTurn = false;
-
     let isRegenerate = false;
     try {
         const chat = horaeManager.getChat();
@@ -18836,10 +18834,8 @@ async function onMessageReceived(messageId) {
 
     if (!isRegenerate && settings.enabled && settings.autoSummaryEnabled && settings.sendTimeline) {
         setTimeout(() => {
-            if (!_autoSummaryRanThisTurn) {
-                checkAutoSummary();
-            }
-        }, 1500);
+            checkAutoSummary();
+        }, 500);
     }
 }
 
@@ -19885,16 +19881,11 @@ jQuery(async () => {
         ], { once: true }); // 在D9999注入一个定位符
     });
 
-    // 并行自动摘要：用户发消息时并行触发（独立API走直接HTTP，不影响主连接）
+    // 用户消息快照刷新（摘要改为在AI回复后统一触发）
     if (event_types.USER_MESSAGE_RENDERED) {
         eventSource.on(event_types.USER_MESSAGE_RENDERED, () => {
             if (settings.enabled) _snapshotCurrentChatMessageRefs();
-            if (!settings.enabled || !settings.autoSummaryEnabled || !settings.sendTimeline) return;
-            _autoSummaryRanThisTurn = true;
-            checkAutoSummary().catch((e) => {
-                console.warn('[Horae] 并行自动摘要失败，将在AI回复后重试:', e);
-                _autoSummaryRanThisTurn = false;
-            });
+            // 摘要改为在AI回复后统一触发，此处不再触发
         });
     }
 
